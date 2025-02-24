@@ -22,6 +22,11 @@ def init_board():
             board[0][col] = ChessPiece('black', piece, f'../images/black_{piece}.png')
             board[7][col] = ChessPiece('white', piece, f'../images/white_{piece}.png')
 
+    # Ensure all other squares are empty (Used to clear pieces when game is reset)
+    for row in range(2, 6):  # Only the inner rows need to be cleared
+        for col in range(8):
+            board[row][col] = None
+
 # Draw updated board
 def draw_board():
     # Fill square board backgrounds
@@ -42,6 +47,25 @@ def draw_board():
     pygame.draw.rect(screen, GRAY, (HEIGHT, 0, WIDTH - HEIGHT, HEIGHT))
     font = pygame.font.Font(None, 36)
 
+    # Difficulty settings label and buttons
+    difficulty_text = font.render("Difficulty", True, WHITE)
+    screen.blit(difficulty_text, (HEIGHT + 25, 75))
+
+    # Difficulty buttons
+    difficulties = ['Easy', 'Medium', 'Hard']
+    y_offset = 115
+    for difficulty in difficulties:
+        # Set text color to green if it's the selected difficulty, otherwise white
+        text_color = GREEN if selected_difficulty == difficulty else WHITE
+        button_text = font.render(difficulty, True, text_color)
+        screen.blit(button_text, (HEIGHT + 25, y_offset))
+        y_offset += 40  # Increment y_offset for the next button
+
+     # Draw "Reset" button
+    reset_button_text = font.render("Reset", True, WHITE)
+    reset_button_y = HEIGHT - 60
+    screen.blit(reset_button_text, (HEIGHT + 25, reset_button_y))
+
     # Only a valid string if game end has not been reached
     if game_over_message:
         lines = game_over_message.split("\n")
@@ -50,6 +74,13 @@ def draw_board():
             text = font.render(line, True, RED)
             screen.blit(text, (HEIGHT + 20, y_offset))
             y_offset += 40
+    
+    # Draw the Start Game button if the game hasn't started
+    elif not game_started:
+        font = pygame.font.Font(None, 36)
+        text = font.render("Start Game", True, WHITE)
+        screen.blit(text, (HEIGHT + 25, 25))
+    
     else:
         text = font.render(f"{current_player.capitalize()}'s Turn", True, BLACK)
         screen.blit(text, (HEIGHT + 20, 20))
@@ -219,19 +250,73 @@ def handle_click(pos):
     col = pos[0] // SQUARE_SIZE
     row = pos[1] // SQUARE_SIZE
 
-    # There is no piece selected yet, select piece user
-    #   clicked on and calculate that piece's moves
-    if selected_piece is None:
-        piece = board[row][col]
-        if piece and piece.color == current_player:
-            selected_piece = piece
-            selected_pos = (row, col)
-            valid_moves = get_valid_moves(piece, row, col)
-    # A piece is selected and user is trying to move to a
-    #   space, carry out move if legal
+    # Check if the click is within the chessboard
+    if 0 <= col < 8 and 0 <= row < 8:
+        # If game has not started yet and chess board is clicked, return
+        if not game_started:
+            return
+        
+        # There is no piece selected yet, select piece user
+        #   clicked on and calculate that piece's moves
+        if selected_piece is None:
+            piece = board[row][col]
+            if piece and piece.color == current_player:
+                selected_piece = piece
+                selected_pos = (row, col)
+                valid_moves = get_valid_moves(piece, row, col)
+        # A piece is selected and user is trying to move to a
+        #   space, carry out move if legal
+        else:
+            if (row, col) in valid_moves:
+                make_move(selected_pos, (row, col))
+            selected_piece = None
+            selected_pos = None
+            valid_moves = []
+    elif HEIGHT <= pos[0] < WIDTH:  # Click within the sidebar
+        sidebar_click(pos)
     else:
-        if (row, col) in valid_moves:
-            make_move(selected_pos, (row, col))
-        selected_piece = None
-        selected_pos = None
-        valid_moves = []
+        # Ignore other clicks
+        return
+
+# Handle sidebar mouse clicks (called from "handle_click" function) 
+def sidebar_click(pos):
+    global game_started, selected_difficulty, current_player
+
+    button_height = 40
+    button_width = WIDTH - HEIGHT
+    button_x = HEIGHT
+    button_y = 0
+
+    # Check if the click is within the "Start Game" button bounds
+    if button_x <= pos[0] < button_x + button_width and button_y <= pos[1] < button_y + button_height:
+        global game_started
+        game_started = True
+
+    # Difficulty button properties
+    difficulties = {'Easy': 115, 'Medium': 155, 'Hard': 195}  # y-offsets for each button
+    difficulty_button_width = 150
+    difficulty_button_x = HEIGHT + 25
+    difficulty_button_height = 40
+
+    # Check if a difficulty button was clicked
+    for difficulty, y_offset in difficulties.items():
+        # Define the rectangle for each difficulty button
+        difficulty_button_rect = pygame.Rect(difficulty_button_x, y_offset, difficulty_button_width, difficulty_button_height)
+
+        # Check if the click is within the bounds of any difficulty button
+        if difficulty_button_rect.collidepoint(pos):
+            selected_difficulty = difficulty  # Update the global difficulty variable
+
+    # Reset button position and dimensions
+    reset_button_x = HEIGHT + 25
+    reset_button_y = HEIGHT - 60
+    reset_button_width = 150
+    reset_button_height = 40
+
+    reset_button_rect = pygame.Rect(reset_button_x, reset_button_y, reset_button_width, reset_button_height)
+    if reset_button_rect.collidepoint(pos):
+        init_board()
+        game_started = False
+        current_player = 'white'
+
+    return
