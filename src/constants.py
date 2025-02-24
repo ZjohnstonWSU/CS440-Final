@@ -14,6 +14,12 @@ GREEN = (0, 196, 0)
 RED = (255, 0, 0)
 GRAY = (200, 200, 200)
 
+# Indicator to track if the game has started
+game_started = False
+
+# Global variable to track the current selected difficulty
+selected_difficulty = 'Easy'
+
 # Initialize screen (move from main.py)
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Chess Game")
