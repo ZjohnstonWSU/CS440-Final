@@ -1,13 +1,18 @@
 from pieces import ChessPiece
 from constants import *
 from evaluation import *
+import chess
+import math
+from copy import deepcopy
 
 # Initialize global variables
 board = [[None for _ in range(8)] for _ in range(8)]
+# chessBoard = chess.Board()
 current_player = 'white'
 selected_piece = None
 selected_pos = None
 game_over_message = None
+max_depth = 3
 
 # Place initial pieces on board
 def init_board():
@@ -85,9 +90,23 @@ def draw_board():
     else:
         text = font.render(f"{current_player.capitalize()}'s Turn", True, BLACK)
         screen.blit(text, (HEIGHT + 20, 20))
-        if is_check(current_player):
+        if is_check(current_player, board):
             check_text = font.render("In Check!", True, RED)
             screen.blit(check_text, (HEIGHT + 20, 60))
+
+def chess_notation(i, j):
+    row = 8 - i  # Convert top-to-bottom index to standard 1-8
+    column = chr(j + ord('a'))  # Convert left-to-right index to 'a'-'h'
+    return f"{column}{row}"
+
+def board_indices(notation):
+    column = notation[0]
+    row = int(notation[1])
+    
+    i = 8 - row  # Convert chess row to 0-indexed row
+    j = ord(column) - ord('a')  # Convert chess column to 0-indexed column
+    
+    return (i, j)
 
 # Carry out move determined by start and end positions
 def make_move(start_pos, end_pos):
@@ -100,16 +119,89 @@ def make_move(start_pos, end_pos):
     if piece.type == 'pawn' and (end_pos[0] == 0 or end_pos[0] == 7):
         board[end_pos[0]][end_pos[1]] = ChessPiece(piece.color, 'queen', f'../images/{piece.color}_queen.png')
     
+    
     # Switch turns
     current_player = 'black' if current_player == 'white' else 'white'
 
-    score = evaluate_board(board)
-    print(score)
-    
     # Check for checkmate
-    if is_check(current_player) and is_game_over():
+    if is_check(current_player, board) and is_game_over(board):
         winner = 'black' if current_player == 'white' else 'white'
         game_over_message = f"Checkmate!\n{winner.capitalize()} wins!"
+
+def getCopyOfBoard():
+    tempBoard = [[None for _ in range(8)] for _ in range(8)]
+    for i in range(8):
+        for j in range(8):
+            piece = board[i][j]
+            if not piece is None:
+                tempBoard[i][j] = ChessPiece(piece.color, piece.type, f'../images/{piece.color}_{piece.type}.png')
+            else:
+                tempBoard[i][j] = None
+    return tempBoard
+
+def make_move_temp(start_pos, end_pos, tempboard):
+    global current_player, game_over_message
+    piece = tempboard[start_pos[0]][start_pos[1]]
+    tempboard[end_pos[0]][end_pos[1]] = piece
+    tempboard[start_pos[0]][start_pos[1]] = None
+
+    if not piece is None and piece.type == 'pawn' and (end_pos[0] == 0 or end_pos[0] == 7):
+        tempboard[end_pos[0]][end_pos[1]] = ChessPiece(piece.color, 'queen', f'../images/{piece.color}_queen.png')
+
+def undo_move(tempBoard, move):
+    start_pos, end_pos = move
+    piece = tempBoard[end_pos[0]][end_pos[1]]
+    tempBoard[start_pos[0]][start_pos[1]] = piece
+    tempBoard[end_pos[0]][end_pos[1]] = None
+
+def minimax(tempBoard, depth, alpha, beta, maximizing_player):
+    if depth == 0 or is_game_over(tempBoard):
+        evulate = evaluate_board(tempBoard)
+        return evulate, None
+
+    if maximizing_player:
+        max_eval = -math.inf
+        best_move = None
+        for move in get_all_moves(tempBoard, 'black'):  # Assuming AI is playing as black
+            make_move_temp(move[0], move[1], tempBoard)
+            eval, _ = minimax(tempBoard, depth - 1, alpha, beta, False)
+            undo_move(tempBoard, move)
+            if eval > max_eval:
+                max_eval = eval
+                best_move = move
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break
+        return max_eval, best_move
+    else:
+        min_eval = math.inf
+        best_move = None
+        for move in get_all_moves(tempBoard, 'white'):
+            make_move_temp(move[0], move[1], tempBoard)
+            eval, _ = minimax(tempBoard, depth - 1, alpha, beta, True)
+            undo_move(tempBoard, move)
+            if eval < min_eval:
+                min_eval = eval
+                best_move = move
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break
+        return min_eval, best_move
+
+def get_all_moves(tempBoard, color):
+    moves = []
+    for row in range(8):
+        for col in range(8):
+            piece = tempBoard[row][col]
+            if piece and piece.color == color:
+                valid_moves = get_valid_moves(piece, row, col, tempBoard)
+                for move in valid_moves:
+                    moves.append(((row, col), move))
+    return moves
+
+def get_best_move(tempBoard):
+    _, best_move = minimax(tempBoard, max_depth, -math.inf, math.inf, True)
+    return best_move
 
 # Update the pieces 
 def draw_piece():
@@ -120,7 +212,7 @@ def draw_piece():
                 screen.blit(piece.image,(col*SQUARE_SIZE, row*SQUARE_SIZE))
 
 # Get valid moves for a given piece
-def get_valid_moves(piece, row, col, check_safety=True):
+def get_valid_moves(piece, row, col, board, check_safety=True):
     moves = []
 
     # Compute moves based on piece type
@@ -204,7 +296,7 @@ def get_valid_moves(piece, row, col, check_safety=True):
         board[row][col] = None  # Temporarily move piece
 
         # Check if king is still safe
-        if not is_check(piece.color):
+        if not is_check(piece.color, board):
             legal_moves.append((r, c))
 
         # Undo the move
@@ -214,7 +306,7 @@ def get_valid_moves(piece, row, col, check_safety=True):
     return legal_moves
 
 # Check if the king is in check
-def is_check(color):
+def is_check(color, board):
     king_pos = None
     for r in range(8):
         for c in range(8):
@@ -230,17 +322,17 @@ def is_check(color):
         for c in range(8):
             piece = board[r][c]
             if piece and piece.color != color:
-                if king_pos in get_valid_moves(piece, r, c, check_safety=False):
+                if king_pos in get_valid_moves(piece, r, c, board, check_safety=False):
                     return True
     return False       
 
 # Check for checkmate by seeing if there are any valid moves left
-def is_game_over():
+def is_game_over(board):
     for r in range(8):
         for c in range(8):
             piece = board[r][c]
             if piece and piece.color == current_player:
-                valid_moves = get_valid_moves(piece,r,c)
+                valid_moves = get_valid_moves(piece,r,c, board)
                 if valid_moves: return False
     return True
 
@@ -267,12 +359,16 @@ def handle_click(pos):
             if piece and piece.color == current_player:
                 selected_piece = piece
                 selected_pos = (row, col)
-                valid_moves = get_valid_moves(piece, row, col)
+                valid_moves = get_valid_moves(piece, row, col, board)
         # A piece is selected and user is trying to move to a
         #   space, carry out move if legal
         else:
             if (row, col) in valid_moves:
                 make_move(selected_pos, (row, col))
+                if not game_over_message and current_player == 'black':   ###
+                    ai_move = get_best_move(getCopyOfBoard())             ###
+                    if ai_move:                                           ###   
+                        make_move(ai_move[0], ai_move[1])  
             selected_piece = None
             selected_pos = None
             valid_moves = []
@@ -284,7 +380,7 @@ def handle_click(pos):
 
 # Handle sidebar mouse clicks (called from "handle_click" function) 
 def sidebar_click(pos):
-    global game_started, selected_difficulty, current_player
+    global game_started, selected_difficulty, current_player, max_depth
 
     button_height = 40
     button_width = WIDTH - HEIGHT
@@ -298,6 +394,7 @@ def sidebar_click(pos):
 
     # Difficulty button properties
     difficulties = {'Easy': 115, 'Medium': 155, 'Hard': 195}  # y-offsets for each button
+    difficultiesMaxDepth = {'Easy': 3, 'Medium': 5, 'Hard': 7}  # y-offsets for each button
     difficulty_button_width = 150
     difficulty_button_x = HEIGHT + 25
     difficulty_button_height = 40
@@ -310,6 +407,7 @@ def sidebar_click(pos):
         # Check if the click is within the bounds of any difficulty button
         if difficulty_button_rect.collidepoint(pos):
             selected_difficulty = difficulty  # Update the global difficulty variable
+            max_depth = difficultiesMaxDepth[difficulty]
 
     # Reset button position and dimensions
     reset_button_x = HEIGHT + 25
