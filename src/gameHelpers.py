@@ -1,5 +1,6 @@
 from pieces import ChessPiece
 from constants import *
+from evaluation import *
 
 # Initialize global variables
 board = [[None for _ in range(8)] for _ in range(8)]
@@ -101,6 +102,9 @@ def make_move(start_pos, end_pos):
     
     # Switch turns
     current_player = 'black' if current_player == 'white' else 'white'
+
+    score = evaluate_board(board)
+    print(score)
     
     # Check for checkmate
     if is_check(current_player) and is_game_over():
