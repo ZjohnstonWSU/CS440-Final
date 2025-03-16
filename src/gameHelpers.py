@@ -1,13 +1,11 @@
 from pieces import ChessPiece
 from constants import *
 from evaluation import *
-import chess
 import math
 from copy import deepcopy
 
 # Initialize global variables
 board = [[None for _ in range(8)] for _ in range(8)]
-# chessBoard = chess.Board()
 current_player = 'white'
 selected_piece = None
 selected_pos = None
