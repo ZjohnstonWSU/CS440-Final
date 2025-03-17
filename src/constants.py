@@ -1,4 +1,5 @@
 import pygame
+from enum import Enum
 
 # Screen constants
 WIDTH, HEIGHT = 900, 720
@@ -13,6 +14,15 @@ YELLOW = (255, 255, 0)
 GREEN = (0, 196, 0)
 RED = (255, 0, 0)
 GRAY = (200, 200, 200)
+
+# Define Chess Pieces types
+class ChessPieceTypes(Enum):
+    PAWN = "pawn"
+    KNIGHT = "knight"
+    BISHOP = "bishop"
+    QUEEN = "queen"
+    KING = "king"
+    ROOK = "rook"
 
 # Indicator to track if the game has started
 game_started = False
