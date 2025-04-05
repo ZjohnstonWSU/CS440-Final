@@ -3,6 +3,7 @@ from constants import *
 from evaluation import *
 import math
 from copy import deepcopy
+import random
 
 # Initialize global variables
 board = [[None for _ in range(8)] for _ in range(8)]
@@ -11,6 +12,7 @@ selected_piece = None
 selected_pos = None
 game_over_message = None
 max_depth = 3
+selected_algorithm = 'Minimax' # Default algorithm
 
 # Place initial pieces on board
 def init_board():
@@ -51,6 +53,20 @@ def draw_board():
     pygame.draw.rect(screen, GRAY, (HEIGHT, 0, WIDTH - HEIGHT, HEIGHT))
     font = pygame.font.Font(None, 36)
 
+    # Add algorithm selection buttons
+    algorithm_text = font.render("Algorithm", True, WHITE)
+    screen.blit(algorithm_text, (HEIGHT + 25, 250))  # Adjust the y-offset as needed
+
+    algorithms = ['Minimax', 'Monte Carlo']
+    y_offset = 290  # Start below the "Algorithm" label
+    for algorithm in algorithms:
+        # Highlight the selected algorithm in green
+        text_color = GREEN if selected_algorithm == algorithm else WHITE
+        button_text = font.render(algorithm, True, text_color)
+        screen.blit(button_text, (HEIGHT + 25, y_offset))
+        y_offset += 40  # Increment y-offset for the next button
+
+
     # Difficulty settings label and buttons
     difficulty_text = font.render("Difficulty", True, WHITE)
     screen.blit(difficulty_text, (HEIGHT + 25, 75))
@@ -65,7 +81,7 @@ def draw_board():
         screen.blit(button_text, (HEIGHT + 25, y_offset))
         y_offset += 40  # Increment y_offset for the next button
 
-     # Draw "Reset" button
+    # Draw "Reset" button
     reset_button_text = font.render("Reset", True, WHITE)
     reset_button_y = HEIGHT - 60
     screen.blit(reset_button_text, (HEIGHT + 25, reset_button_y))
@@ -137,14 +153,25 @@ def getCopyOfBoard():
                 tempBoard[i][j] = None
     return tempBoard
 
-def make_move_temp(start_pos, end_pos, tempboard):
+def getMonteCarloBoard():
+    tempBoard = [[None for _ in range(8)] for _ in range(8)]
+    for i in range(8):
+        for j in range(8):
+            piece = board[i][j]
+            if piece is not None:
+                tempBoard[i][j] = ChessPiece(piece.color, piece.type, None)
+            else:
+                tempBoard[i][j] = None
+    return tempBoard
+
+def make_move_temp(start_pos, end_pos, tempBoard):
     global current_player, game_over_message
-    piece = tempboard[start_pos[0]][start_pos[1]]
-    tempboard[end_pos[0]][end_pos[1]] = piece
-    tempboard[start_pos[0]][start_pos[1]] = None
+    piece = tempBoard[start_pos[0]][start_pos[1]]
+    tempBoard[end_pos[0]][end_pos[1]] = piece
+    tempBoard[start_pos[0]][start_pos[1]] = None
 
     if not piece is None and piece.type == 'pawn' and (end_pos[0] == 0 or end_pos[0] == 7):
-        tempboard[end_pos[0]][end_pos[1]] = ChessPiece(piece.color, 'queen', f'../images/{piece.color}_queen.png')
+        tempBoard[end_pos[0]][end_pos[1]] = ChessPiece(piece.color, 'queen', f'../images/{piece.color}_queen.png')
 
 def undo_move(tempBoard, move):
     start_pos, end_pos = move
@@ -185,6 +212,47 @@ def minimax(tempBoard, depth, alpha, beta, maximizing_player):
             if beta <= alpha:
                 break
         return min_eval, best_move
+
+def monte_carlo(tempBoard, simulations):
+    best_move = None
+    best_score = -math.inf
+
+    # Get all possible moves for the current player
+    moves = get_all_moves(tempBoard, 'black') # Assuming AI is playing as black
+
+    for move in moves:
+        total_score = 0
+
+        # Simulate games for the current move
+        for _ in range(simulations):
+            # Create a copy of the board for simulation
+            simulated_board = deepcopy(getMonteCarloBoard())
+            make_move_temp(move[0], move[1], simulated_board)
+
+            # Play random moves until the game ends
+            while not is_game_over(simulated_board):
+                # Get all valid moves for the current player
+                current_color = 'white' if current_player == 'black' else 'black'
+                random_moves = get_all_moves(simulated_board, current_color)
+
+                if not random_moves:
+                    break
+
+                random_move = random.choice(random_moves)
+                make_move_temp(random_move[0], random_move[1], simulated_board)
+            
+            # Evaluate the final board state
+            total_score += evaluate_board(simulated_board)
+
+        # Calculate the average score for the current move
+        average_score = total_score / simulations
+
+        # Update the best move if the average score is better
+        if average_score > best_score:
+            best_score = average_score
+            best_move = move
+
+    return best_move
 
 def get_all_moves(tempBoard, color):
     moves = []
@@ -364,8 +432,23 @@ def handle_click(pos):
             if (row, col) in valid_moves:
                 make_move(selected_pos, (row, col))
                 if not game_over_message and current_player == 'black':   ###
-                    ai_move = get_best_move(getCopyOfBoard())             ###
-                    if ai_move:                                           ###   
+                    if selected_algorithm == 'Minimax':
+                        ai_move = get_best_move(getCopyOfBoard())  # Use Minimax
+                    elif selected_algorithm == 'Monte Carlo':
+                        if selected_difficulty == 'Easy':
+                            simulations = 1
+                        elif selected_difficulty == 'Medium':
+                            simulations = 3
+                        elif selected_difficulty == 'Hard':
+                            simulations = 5
+                        else:
+                            simulations = 3 # Default to Medium
+
+                        ai_move = monte_carlo(getCopyOfBoard(), simulations)  # Use Monte Carlo
+                    else:
+                        ai_move = None  # Fallback in case no algorithm is selected
+
+                    if ai_move:
                         make_move(ai_move[0], ai_move[1])  
             selected_piece = None
             selected_pos = None
@@ -389,6 +472,22 @@ def sidebar_click(pos):
     if button_x <= pos[0] < button_x + button_width and button_y <= pos[1] < button_y + button_height:
         global game_started
         game_started = True
+
+    # Algorithm button properties
+    algorithms = {'Minimax': 290, 'Monte Carlo': 330}  # y-offsets for each button
+    algorithm_button_width = 150
+    algorithm_button_x = HEIGHT + 25
+    algorithm_button_height = 40
+
+    # Check if an algorithm button was clicked
+    for algorithm, y_offset in algorithms.items():
+        # Define the rectangle for each algorithm button
+        algorithm_button_rect = pygame.Rect(algorithm_button_x, y_offset, algorithm_button_width, algorithm_button_height)
+
+        # Check if the click is within the bounds of any algorithm button
+        if algorithm_button_rect.collidepoint(pos):
+            global selected_algorithm
+            selected_algorithm = algorithm  # Update the selected algorithm
 
     # Difficulty button properties
     difficulties = {'Easy': 115, 'Medium': 155, 'Hard': 195}  # y-offsets for each button
