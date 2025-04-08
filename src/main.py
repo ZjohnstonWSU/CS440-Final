@@ -7,7 +7,7 @@ pygame.init()
 
 #Main game loop
 def main():
-    init_board()
+    # init_board() # Commented out to wait for user to choose color and start game before populating board
 
     while True:
         for event in pygame.event.get():
