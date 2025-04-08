@@ -87,40 +87,40 @@ knight_eval = [
 
 piece_eval = {
     ChessPieceTypes.PAWN.value: {
-        'white': pawn_eval_white,
-        'black': pawn_eval_black
+        'White': pawn_eval_white,
+        'Black': pawn_eval_black
     },
     ChessPieceTypes.ROOK.value: {
-        'white': rook_eval_white,
-        'black': rook_eval_black
+        'White': rook_eval_white,
+        'Black': rook_eval_black
     },
     ChessPieceTypes.KNIGHT.value: {
-        'white': knight_eval,
-        'black': knight_eval
+        'White': knight_eval,
+        'Black': knight_eval
     },
     ChessPieceTypes.BISHOP.value: {
-        'white': bishop_eval_white,
-        'black': bishop_eval_black
+        'White': bishop_eval_white,
+        'Black': bishop_eval_black
     },
     ChessPieceTypes.QUEEN.value: {
-        'white': eval_queen, 
-        'black': eval_queen
+        'White': eval_queen, 
+        'Black': eval_queen
     },
     ChessPieceTypes.KING.value: {
-        'white': king_eval_white,
-        'black': king_eval_black
+        'White': king_eval_white,
+        'Black': king_eval_black
     }
 }
 
 def get_piece_value(piece, x, y):
     if piece is None:
         return 0
-    absolute_value = get_absolute_value(piece, piece.color == 'white', x, y)
-    return absolute_value if piece.color == 'white' else -absolute_value
+    absolute_value = get_absolute_value(piece, piece.color == 'White', x, y)
+    return absolute_value if piece.color == 'White' else -absolute_value
 
 def get_absolute_value(piece, is_white, x, y):
     piece_type = piece.type
-    piece_color = 'white' if is_white else 'black'
+    piece_color = 'White' if is_white else 'Black'
 
     piece_eval_data = piece_eval.get(piece_type, {}).get(piece_color)
 
