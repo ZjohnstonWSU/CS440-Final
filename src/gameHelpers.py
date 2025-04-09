@@ -43,7 +43,7 @@ def init_board():
         for row in board:
             row.reverse()
         # Set correct color for player
-        current_player = 'Black'
+        current_player = 'White'
     else:
         current_player = 'White'
 
@@ -478,26 +478,13 @@ def handle_click(pos):
         else:
             if (row, col) in valid_moves:
                 make_move(selected_pos, (row, col))
-        
-                if not game_over_message and current_player != selected_color:   
-                    if selected_algorithm == 'Minimax':
-                        ai_move = get_best_move(getCopyOfBoard())  # Use Minimax
-                    elif selected_algorithm == 'Monte Carlo':
-                        if selected_difficulty == 'Easy':
-                            simulations = 1
-                        elif selected_difficulty == 'Medium':
-                            simulations = 3
-                        elif selected_difficulty == 'Hard':
-                            simulations = 5
-                        else:
-                            simulations = 3 # Default to Medium
 
-                        ai_move = monte_carlo(getCopyOfBoard(), simulations)  # Use Monte Carlo
-                    else:
-                        ai_move = None  # Fallback in case no algorithm is selected
-
-                    if ai_move:
-                        make_move(ai_move[0], ai_move[1])  
+                # Update board before processing AI input
+                draw_board()
+                draw_piece()
+                pygame.display.update() 
+                if not game_over_message and current_player != selected_color:
+                    process_AI_input()
             selected_piece = None
             selected_pos = None
             valid_moves = []
@@ -506,6 +493,28 @@ def handle_click(pos):
     else:
         # Ignore other clicks
         return
+    
+def process_AI_input():
+    global selected_algorithm, selected_difficulty
+    if selected_algorithm == 'Minimax':
+        ai_move = get_best_move(getCopyOfBoard())  # Use Minimax
+    elif selected_algorithm == 'Monte Carlo':
+        if selected_difficulty == 'Easy':
+            simulations = 1
+        elif selected_difficulty == 'Medium':
+            simulations = 3
+        elif selected_difficulty == 'Hard':
+            simulations = 5
+        else:
+            simulations = 3 # Default to Medium
+
+        ai_move = monte_carlo(getCopyOfBoard(), simulations)  # Use Monte Carlo
+    else:
+        ai_move = None  # Fallback in case no algorithm is selected
+
+    if ai_move:
+        make_move(ai_move[0], ai_move[1]) 
+    return
 
 # Handle sidebar mouse clicks (called from "handle_click" function) 
 def sidebar_click(pos):
@@ -529,6 +538,14 @@ def sidebar_click(pos):
         game_started = True
         init_board()  # Initialize the board when "Start Game" is clicked
         draw_board()  # Redraw board to reflect the initial piece placements
+        draw_piece()
+        pygame.display.update()
+
+        if selected_color == "Black":
+            process_AI_input()
+            draw_board()
+            draw_piece()
+            pygame.display.update()
 
     # Algorithm button properties
     algorithms = {'Minimax': 290, 'Monte Carlo': 330}  # y-offsets for each button
@@ -575,8 +592,8 @@ def sidebar_click(pos):
         # Define the rectangle for each color button
         play_as_button_rect = pygame.Rect(play_as_button_x, y_offset, play_as_button_width, play_as_button_height)
 
-        # Check if the click is within the bounds of any color button
-        if play_as_button_rect.collidepoint(pos):
+        # Check if the click is within the bounds of any color button - disabled if game is already started
+        if play_as_button_rect.collidepoint(pos) and game_started == False:
             selected_color = color  # Update the selected color
             draw_board()  # Redraw the board to reflect the new selected color
             break  # Break the loop once a color is selected
